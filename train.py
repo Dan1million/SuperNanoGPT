@@ -41,6 +41,20 @@ def get_batch(split):
     x, y = x.to(device), y.to(device)
     return x, y
 
+@torch.no_grad() # we will not call backward for back propogation in this function --> removes memory
+def estimate_loss():
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split)
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
+
 # Create language model and offload to GPU if possible
 model = bigramLanguageModel.BigramLanguageModel(vocab_size)
 m = model.to(device)
@@ -50,7 +64,11 @@ m = model.to(device)
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
 # Training loop
-for steps in range(max_iters):
+for iter in range(max_iters):
+    if iter % eval_interval == 0:
+        losses = estimate_loss()
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
     # sample the training data
     xb, yb = get_batch('train')
 
