@@ -1,7 +1,5 @@
 import torch;
-import torch.nn as nn
-from torch.nn import functional as F
-import bigramLanguageModel
+from languageModel.bigramLanguageModel import BigramLanguageModel
 
 # Parameters
 block_size = 64 # Maximum context length
@@ -13,7 +11,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
 n_embd = 384
 n_layer = 6
-n_head = 6
+n_heads = 6
 dropout = 0.2
 
 # set torch seed
@@ -62,7 +60,7 @@ def estimate_loss():
     return out
 
 # Create language model and offload to GPU if possible
-model = bigramLanguageModel.BigramLanguageModel(block_size, device, vocab_size, n_embd, n_layer, n_head, dropout)
+model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, vocab_size)
 m = model.to(device)
 
 # Print number of parameters

@@ -12,7 +12,7 @@ class TransformerBlock(nn.Module):
             capabilities.
 
             Args:
-                n_heads int: Nubmer of heads in the attention block
+                n_heads int: Nubmer of heads in the multi-headed attention block
                 block_size int: Maximum nubmer of tokens processed at once
                 n_embd int: number of dimensions in the embedding
                 dropout float32: percentage of results to "dropout" to maintain evolution --> See: https://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf?utm_content=buffer79b4
