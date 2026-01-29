@@ -6,20 +6,20 @@ class TransformerBlock(nn.Module):
         Implementation of a decode only transformer block as outlined in "Attention Is All You Need"
     """
 
-    def __init__(self, n_heads, block_size, n_embd, dropout):
+    def __init__(self, block_size, dropout, n_embd, n_heads):
         """
             Initializes a decode only transformer block with feed-forward and layer-normalization
             capabilities.
 
             Args:
-                n_heads int: Nubmer of heads in the multi-headed attention block
-                block_size int: Maximum nubmer of tokens processed at once
-                n_embd int: number of dimensions in the embedding
+                block_size int: Maximum Number of tokens processed at once
                 dropout float32: percentage of results to "dropout" to maintain evolution --> See: https://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf?utm_content=buffer79b4
+                n_embd int: number of dimensions in the embedding
+                n_heads int: Number of heads in the multi-headed attention block
         """
         super().__init__()
-        self.sa = MultiHeadAttention(n_heads, block_size, n_embd, dropout)
-        self.ffwd = FeedForward(n_embd, dropout)
+        self.sa = MultiHeadAttention(block_size, dropout, n_embd, n_heads)
+        self.ffwd = FeedForward(dropout, n_embd)
         self.ln1 = nn.LayerNorm(n_embd)
         self.ln2 = nn.LayerNorm(n_embd)
     
@@ -40,14 +40,14 @@ class FeedForward(nn.Module):
         the batch are forwarded to the tokens ahead.
     """
 
-    def __init__(self, n_embd, dropout):
+    def __init__(self, dropout, n_embd):
         """
             Initializes a simple feed forward with ReLU and dropout. Explained on pg 5. section 3.3
             in "Attention Is All You Need"
 
             Args:
-                n_embd int: number of dimensions in the embedding
                 dropout float32: percentage of results to "dropout" to maintain evolution
+                n_embd int: number of dimensions in the embedding
         """
         super().__init__()
         self.net = nn.Sequential(

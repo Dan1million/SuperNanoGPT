@@ -16,18 +16,18 @@ class BigramLanguageModel(nn.Module):
             normalization, andembedding score calculator (outputs logits)
 
             Args:
-                block_size int: Maximum nubmer of tokens processed at once
+                block_size int: Maximum Number of tokens processed at once
                 device string: cuda if Cuda is supported, CPU otherwise
                 dropout float32: percentage of results to "dropout" to maintain evolution --> See: https://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf?utm_content=buffer79b4
                 n_embd int: number of dimensions in the embedding
-                n_heads int: Nubmer of heads in each multi-headed attention block
-                n_layer: nubmer of transformers in the language model
+                n_heads int: Number of heads in each multi-headed attention block
+                n_layer: Number of transformers in the language model
                 vocab_size: the size of the token vocabulary 
         """
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[TransformerBlock(n_heads, block_size, n_embd, dropout) for _ in range(n_layer)])
+        self.blocks = nn.Sequential(*[TransformerBlock(block_size, dropout, n_embd, n_heads) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
         self.block_size = block_size

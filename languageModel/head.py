@@ -14,19 +14,19 @@ class MultiHeadAttention(nn.Module):
         set that requires any kind of additional encoding.
     """
 
-    def __init__(self, n_heads, block_size, n_embd, dropout):
+    def __init__(self, block_size, dropout, n_embd, n_heads):
         """
             Initializes a multi-headed attention block
         
             Args:
-                n_heads int: Nubmer of heads in the attention block
-                block_size int: Maximum nubmer of tokens processed at once
-                n_embd int: number of dimensions in the embedding
+                block_size int: Maximum Number of tokens processed at once
                 dropout float32: percentage of results to "dropout" to maintain evolution --> See: https://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf?utm_content=buffer79b4
+                n_embd int: number of dimensions in the embedding
+                n_heads int: Number of heads in the attention block
         """
         super().__init__()
         head_size = n_embd // n_heads
-        self.heads = nn.ModuleList([Head(block_size, head_size, n_embd, dropout) for _ in range(n_heads)])
+        self.heads = nn.ModuleList([Head(block_size, dropout, head_size, n_embd) for _ in range(n_heads)])
         self.proj = nn.Linear(n_embd, n_embd)
     
     def forward(self, x):
@@ -48,15 +48,15 @@ class Head(nn.Module):
         Attention(Q, K, V) equation
     """
 
-    def __init__(self, block_size, head_size, n_embd, dropout):
+    def __init__(self, block_size, dropout, head_size, n_embd):
         """
             Initializes a single head of a self attention
 
             Args:
-                block_size int: Maximum nubmer of tokens processed at once
+                block_size int: Maximum Number of tokens processed at once
+                dropout float32: percentage of results to "dropout" to maintain evolution
                 head_size int: the size of this individual attention head
                 n_embd int: number of dimensions in the embedding
-                dropout float32: percentage of results to "dropout" to maintain evolution
         """
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
