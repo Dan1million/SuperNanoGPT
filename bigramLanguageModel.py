@@ -12,7 +12,8 @@ class BigramLanguageModel(nn.Module):
         self.blocks = nn.Sequential(
             Block(n_embd, 4, block_size),
             Block(n_embd, 4, block_size),
-            Block(n_embd, 4, block_size)
+            Block(n_embd, 4, block_size),
+            nn.LayerNorm(n_embd),
         )
         self.lm_head = nn.Linear(n_embd, vocab_size)
         self.block_size = block_size
@@ -67,10 +68,12 @@ class Block(nn.Module):
         head_size = n_embd // n_head
         self.sa = MultiHeadAttention(n_head, block_size, head_size, n_embd)
         self.ffwd = FeedForward(n_embd)
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
     
     def forward(self, x):
-        x = x + self.sa(x) # +x sets up residual ocnnections
-        x = x + self.ffwd(x)
+        x = x + self.sa(self.ln1(x)) # +x sets up residual connections
+        x = x + self.ffwd(self.ln2(x)) # ln performs layer normalization --> both parts of this in 
         return x
 
 # Simple feed forward layer --> Tokens "think" on data individually
