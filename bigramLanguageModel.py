@@ -69,8 +69,8 @@ class Block(nn.Module):
         self.ffwd = FeedForward(n_embd)
     
     def forward(self, x):
-        x = self.sa(x)
-        x = self.ffwd(x)
+        x = x + self.sa(x) # +x sets up residual ocnnections
+        x = x + self.ffwd(x)
         return x
 
 # Simple feed forward layer --> Tokens "think" on data individually
@@ -79,8 +79,9 @@ class FeedForward(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_embd, n_embd),
+            nn.Linear(n_embd, 4 * n_embd),
             nn.ReLU(),
+            nn.Linear(4 * n_embd, n_embd),
         )
     
     def forward(self, x):
