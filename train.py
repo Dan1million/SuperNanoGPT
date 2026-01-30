@@ -28,7 +28,7 @@ with open(f'datasets/{config_data['dataset']}', 'r', encoding='utf-8') as f :
     text = f.read()
 
 
-# Tokenizaiton --> Each unique character is a token
+# Tokenization --> Each unique character is a token
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
 # Create mapping to convert tokens to integers and vice versa
