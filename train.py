@@ -78,11 +78,19 @@ print(sum(p.numel() for p in m.parameters()), 'Parameters')
 # Using the AdamW pytorch optimizer --> performs the gradient descent calculation gradient descent
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
+# Learning rate warmup with cosine decay
+warmup_iters = int(0.1*max_iters)
+cosine_iters = max_iters - warmup_iters
+
+warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)
+cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_iters)
+scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_iters])
+
 # Training loop
 for iter in range(max_iters):
     if iter % eval_interval == 0: # Occasionaly output current state of training
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {scheduler.get_last_lr()[0]:.6f}")
 
     # Sample the training data
     xb, yb = get_batch('train')
@@ -92,6 +100,7 @@ for iter in range(max_iters):
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
+    scheduler.step()
 
 # Create a directory for the current time and save the configuration and trained result
 date_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
