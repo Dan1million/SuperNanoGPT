@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description="Train a Bigram Language Model")
 parser.add_argument('--config', type=str, default='config/config.json', help='Path to the configuration file')
 parser.add_argument('--dataset', type=str, default='datasets/tinyShakespeare.txt', help='Path to the dataset file')
 parser.add_argument('--output', type=str, default=f'savedResults/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}', help='Directory to save the trained model, cofiguration, and checkpoints')
-parser.add_argument('--resume', type=str, default=None, help='Resume training from the latest checkpoint')
+parser.add_argument('--resume', type=str, default=None, help='Resume training from the latest checkpoint. Argument is the path to the checkpoint directory.')
 args = parser.parse_args()
 
 print("Welcome to Super GPT Nano Training!")
@@ -166,9 +166,8 @@ for iter in range(current_iter, max_iters):
 
 # Save final results
 print("Saving final model")
-os.makedirs(f'{args.output}/checkpoints/final', exist_ok=True)
-torch.save(m.state_dict(), f'{args.output}/checkpoints/final/result.pt')
-torch.save(optimizer.state_dict(), f'{args.output}/checkpoints/final/optimizer.pt')
-torch.save(scheduler.state_dict(), f'{args.output}/checkpoints/final/scheduler.pt')
-with open(f'{args.output}/checkpoints/final/config.json', 'w') as json_file:
+torch.save(m.state_dict(), f'{args.output}/result.pt')
+torch.save(optimizer.state_dict(), f'{args.output}/optimizer.pt')
+torch.save(scheduler.state_dict(), f'{args.output}/scheduler.pt')
+with open(f'{args.output}/config.json', 'w') as json_file:
     json.dump(config_data, json_file, indent=4)

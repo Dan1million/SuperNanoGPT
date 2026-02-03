@@ -29,15 +29,26 @@ Run ```py generate.py <dateTimeString>```  which does the following
 Note: an example trained model is under **savedResults/2026-01-29_17-30-23**
 
 ## Learnings
-This was incredibly fun and difficult to implement. Before following along with Andrej Karpathy's video I had watched the series by 3Blue1Brown that explains at a high level the math and computations that go into creating a basic neural network and GPT model [link to the playlist here](https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi). From there Andrej Karpathy's video provided a step by step guide on the actual implementation of the theory that I had learned in a way that made the concepts approachable and simple to implement.
+This was incredibly fun and difficult to implement. Before following along with Andrej Karpathy's video I had watched the series by 3Blue1Brown that explains at a high level the math and computations that go into creating a basic neural network and GPT model [link to the playlist here](https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi). From there Andrej Karpathy's video provided a guide on the initial implementation of a basic GPT model using PyTorch.
+
+From there I have done the following
+* Refined and documented code
+* Added learning rate warmup and cosine decay
+* Implemented gradient clipping
+* Added checkpointing and resuming from a checkpoint
+* Improved configurability through the use of a configuration file
+* Added ability to generate from saved GPT results
 
 From this project, I gained hands-on experience with:
+* The PyTorch SDK
 * Tokenization and vocabulary building
 * Dataset batching and sampling
 * Cross-entropy loss calculation
 * Multi-head self-attention
 * Feed-forward networks and layer normalization
 * Dropout for regularization
+* Learning rate configuration
+* Gradient clipping
 
 ## Specs
 **Parameters**: 10,715,201<br>
@@ -73,3 +84,28 @@ And to your mother hath young.
 
 HARTIUS:
 He will a woman of brain,
+
+# Advanced Usage
+This section outlines advanced usage features for training
+
+### Advanced Training
+The complete arguments for train.py are as follows
+``` bash
+train.py [-h] [--config CONFIG] [--dataset DATASET] [--output OUTPUT] [--resume RESUME]
+```
+
+All advanced parameters are **optional**
+``` bash
+-h, --help         show the help message and exit
+--config CONFIG    Path to the configuration file (default config/config.json)
+--dataset DATASET  Path to the dataset file (default datasets/tinyShakespeare.txt)
+--output OUTPUT    Directory to save the trained model, cofiguration, and checkpoints (default savedResults/<currentDateTime>)
+--resume RESUME    Resume training from the latest checkpoint. Argument is the path to the checkpoint directory. (default None)
+```
+
+### Loading a Checkpoint
+Loading from a checkpoint is simple. Just run the following command
+``` bash
+py train.py --resume <pathToCheckpointDirectory>
+```
+Example Directory:  **savedResults\2026-02-03_07-31-52\checkpoints\iteration_500**
