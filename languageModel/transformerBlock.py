@@ -50,7 +50,7 @@ class FeedForward(nn.Module):
                 n_embd int: number of dimensions in the embedding
         """
         super().__init__()
-        self.net = nn.Sequential(
+        self.net = nn.Sequential( # Multi-layer perceptron
             nn.Linear(n_embd, 4 * n_embd),
             nn.ReLU(),
             nn.Linear(4 * n_embd, n_embd),

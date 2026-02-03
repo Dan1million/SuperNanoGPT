@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -5,20 +6,19 @@ import torch
 from languageModel.bigramLanguageModel import BigramLanguageModel
 from tokenizer.tokenizer import Tokenizer
 
+print("----- Super GPT nano Text Generation -----")
 # Parse argument for directory holding the GPT model
-if len(sys.argv) > 1:
-    trained_data_path = sys.argv[1]
-else:
-    print("ERROR: No arguments passed")
-    print("USAGE: py generate.py <date_time_string>")
-    sys.exit()
+parser = argparse.ArgumentParser(description="Generate text using a trained GPT model")
+parser.add_argument("--gpt_path", type=str, default='savedResults\\2026-01-29_17-30-23', help="directory path to the trained GPT model")
+parser.add_argument('--tokens', type=int, default=500, help='Number of tokens to generate')
+args = parser.parse_args()
 
-# Check that GPT directory exists
-if os.path.isdir(f'savedResults/{trained_data_path}'):
-    with open(f'savedResults/{trained_data_path}/config.json', 'r') as configuration:
+# Check that the GPT directory exists
+if os.path.isdir(args.gpt_path):
+    with open(f'{args.gpt_path}/config.json', 'r') as configuration:
         config_data = json.load(configuration)
 else:
-    print(f'ERROR: Folder at folder path {trained_data_path} does not exist')
+    print(f'ERROR: Folder at folder path {args.gpt_path} does not exist')
     sys.exit()
 
 # Parameters From Config File
@@ -34,7 +34,7 @@ with open(f'datasets/{config_data['dataset']}', 'r', encoding='utf-8') as f :
 
 tokenizer = Tokenizer(text)
 model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, tokenizer.vocab_size())
-model.load_state_dict(torch.load(f'savedResults/{trained_data_path}/result.pt', weights_only=True))
+model.load_state_dict(torch.load(f'{args.gpt_path}/result.pt', weights_only=True))
 model.eval()
 m = model.to(device)
 
@@ -42,4 +42,4 @@ m = model.to(device)
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 
 # Generate new tokens using the GPT model!
-print(tokenizer.decode(m.generate(idx = context, max_new_tokens=500)[0].tolist()))
+print(tokenizer.decode(m.generate(idx = context, max_new_tokens=args.tokens)[0].tolist()))
