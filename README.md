@@ -22,7 +22,7 @@ Run ```py train.py``` which does the following
 3. Save the configuration used and training result to **savedResults/\<dateTimeString\>/**
 
 ### Run The GPT Model
-Run ```py generate.py <dateTimeString>```  which does the following
+Run ```py generate.py```  which does the following
 1. Read the configuration used and trained data from **savedResults/\<dateTimeString\>/**
 2. Run the GPT model
 
@@ -109,3 +109,17 @@ Loading from a checkpoint is simple. Just run the following command
 py train.py --resume <pathToCheckpointDirectory>
 ```
 Example Directory:  **savedResults\2026-02-03_07-31-52\checkpoints\iteration_500**
+
+### Advanced Generating
+The complete arguments for generate.py are as follows
+``` bash
+generate.py [-h] [--gpt_path GPT_PATH] [--tokens TOKENS]
+```
+
+All advanced parameters are **optional**
+``` bash
+-h, --help           show this help message and exit
+--gpt_path GPT_PATH  directory path to the trained GPT model
+--tokens TOKENS      Number of tokens to generate
+```
+Example gpt_path:  **savedResults\2026-02-03_07-31-52**
