@@ -11,7 +11,20 @@ parser = argparse.ArgumentParser(description="Train a Bigram Language Model")
 parser.add_argument('--config', type=str, default='config/config.json', help='Path to the configuration file')
 parser.add_argument('--dataset', type=str, default='datasets/tinyShakespeare.txt', help='Path to the dataset file')
 parser.add_argument('--output', type=str, default=f'savedResults/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}', help='Directory to save the trained model, cofiguration, and checkpoints')
+parser.add_argument('--resume', type=str, default=None, help='Resume training from the latest checkpoint')
 args = parser.parse_args()
+
+print("Welcome to Super GPT Nano Training!")
+print("Training Configuration:", json.dumps(vars(args), indent=4))
+
+# Resuming from checkpoint or starting from scratch?
+from_scratch = True
+if args.resume is not None:
+    if os.path.exists(args.resume):
+        checkpoint_path = args.resume
+        from_scratch = False
+    else:
+        raise ValueError(f"Checkpoint path {args.resume} does not exist.")
 
 # Parameters From Config File
 with open(args.config, 'r') as configuration:
@@ -30,7 +43,7 @@ n_heads = config_data['n_heads'] # Number of heads in each multi-headed attentio
 dropout = config_data['dropout'] # Dropout percentage to maintain evolution
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # Device to run the language model on
 
-
+print(f'Loading Dataset from {args.dataset}')
 with open(args.dataset, 'r', encoding='utf-8') as f : # Read in the data set
     text = f.read()
 
@@ -38,11 +51,13 @@ os.makedirs(args.output, exist_ok=True) # Setup output directory
 os.makedirs(f'{args.output}/checkpoints', exist_ok=True) # Setup checkpoints directory
 
 # Split the dataset into a training dataset and validation dataset
+print("Tokenizing Dataset")
 tokenizer = Tokenizer(text)
 data = torch.tensor(tokenizer.encode(text), dtype=torch.long)
 n = int(0.8*len(data))
 train_data = data[:n] # 80% to train
 val_data = data[n:] # 20% to test
+print(f'Dataset has {tokenizer.vocab_size()} unique characters, {len(train_data)} training tokens and {len(val_data)} validation tokens.')
 
 
 def get_batch(dataset):
@@ -76,26 +91,56 @@ def estimate_loss():
     model.train()
     return out
 
-# Create the bigram language model and offload to GPU if possible
-model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, tokenizer.vocab_size())
+if not from_scratch:
+    # Load model checkpoint
+    print(f"Resuming training from checkpoint at {checkpoint_path}")
+    checkpoint = torch.load(os.path.join(checkpoint_path, 'result.pt'), weights_only=True)
+    model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, tokenizer.vocab_size())
+    model.load_state_dict(checkpoint)
+    model = model.to(device)
+else:
+    # Create the bigram language model from scratch
+    print("Creating model from scratch")
+    model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, tokenizer.vocab_size())
+
+# Move to GPU if available
 m = model.to(device)
-
-# Output number of parameters to command line
-print(sum(p.numel() for p in m.parameters()), 'Parameters')
-
-# Using the AdamW pytorch optimizer --> performs the gradient descent calculation gradient descent
-optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
 # Learning rate warmup with cosine decay
 warmup_iters = int(0.1*max_iters)
 cosine_iters = max_iters - warmup_iters
 
-warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)
-cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_iters)
-scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_iters])
+# Load the Optimizer and Scheduler from checkpoint if resuming
+if not from_scratch:
+    print("Loading Optimizer and Scheduler state from checkpoint")
+    # Load Optimizer state from checkpoint
+    optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
+    optimizer_state = torch.load(os.path.join(checkpoint_path, 'optimizer.pt'))
+    optimizer.load_state_dict(optimizer_state)
+    # Load Scheduler state from checkpoint
+    scheduler_state = torch.load(os.path.join(checkpoint_path, 'scheduler.pt'))
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_iters)
+    scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_iters])
+    scheduler.load_state_dict(scheduler_state)
+else:
+    print("Creating Optimizer and Scheduler from scratch")
+    # Create Optimizer and Scheduler from scratch
+    optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_iters)
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_iters)
+    scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_iters])
+
+# Output number of parameters to command line
+print("Number of parameters:", sum(p.numel() for p in m.parameters()), 'Parameters')
+
+current_iter = 0
+if not from_scratch:
+    current_iter = int(checkpoint_path.split('_')[-1]) # Extract current iteration from checkpoint path
+    print(f'Resuming from iteration {current_iter}')
 
 # Training loop
-for iter in range(max_iters):
+for iter in range(current_iter, max_iters):
     if iter % eval_interval == 0: # Occasionaly output current state of training
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {scheduler.get_last_lr()[0]:.6f}")
@@ -104,6 +149,7 @@ for iter in range(max_iters):
         os.makedirs(f'{args.output}/checkpoints/iteration_{iter}', exist_ok=True)
         torch.save(m.state_dict(), f'{args.output}/checkpoints/iteration_{iter}/result.pt')
         torch.save(optimizer.state_dict(), f'{args.output}/checkpoints/iteration_{iter}/optimizer.pt')
+        torch.save(scheduler.state_dict(), f'{args.output}/checkpoints/iteration_{iter}/scheduler.pt')
         with open(f'{args.output}/checkpoints/iteration_{iter}/config.json', 'w') as json_file:
             json.dump(config_data, json_file, indent=4)
 
@@ -119,8 +165,10 @@ for iter in range(max_iters):
     scheduler.step()
 
 # Save final results
+print("Saving final model")
 os.makedirs(f'{args.output}/checkpoints/final', exist_ok=True)
 torch.save(m.state_dict(), f'{args.output}/checkpoints/final/result.pt')
 torch.save(optimizer.state_dict(), f'{args.output}/checkpoints/final/optimizer.pt')
+torch.save(scheduler.state_dict(), f'{args.output}/checkpoints/final/scheduler.pt')
 with open(f'{args.output}/checkpoints/final/config.json', 'w') as json_file:
     json.dump(config_data, json_file, indent=4)
