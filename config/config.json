@@ -1,14 +1,15 @@
 {
-    "batch_size": 256,
-    "block_size": 64,
-    "checkpoint_interval": 500,
+    "batch_size": 32,
+    "block_size": 256,
+    "checkpoint_interval": 5000,
     "dataset": "tinyShakespeare.txt",
+    "use_openwebtext": true,
     "dropout": 0.2,
-    "eval_interval": 300,
+    "eval_interval": 1,
     "eval_iters": 200,
     "learning_rate": 0.0003,
-    "max_iters": 5000,
-    "n_embd": 384,
-    "n_layer": 6,
-    "n_heads": 6
+    "max_iters": 500,
+    "n_embd": 1024,
+    "n_layer": 8,
+    "n_heads": 8
 }

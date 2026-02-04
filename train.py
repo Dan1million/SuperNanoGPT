@@ -5,13 +5,16 @@ import torch
 from datetime import datetime
 from torch.amp import autocast
 from torch.amp import GradScaler
+from datasets import load_dataset
 from languageModel.bigramLanguageModel import BigramLanguageModel
 from tokenizer.tokenizer import Tokenizer
 
-# CLI Parameters
+# /////////////////////////////////////////////////////
+# Parse command line arguments
+# /////////////////////////////////////////////////////
 parser = argparse.ArgumentParser(description="Train a Bigram Language Model")
 parser.add_argument('--config', type=str, default='config/config.json', help='Path to the configuration file')
-parser.add_argument('--dataset', type=str, default='datasets/tinyShakespeare.txt', help='Path to the dataset file')
+parser.add_argument('--vocab', type=str, default=None, help='Path to a pre-built vocabulary file')
 parser.add_argument('--output', type=str, default=f'savedResults/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}', help='Directory to save the trained model, cofiguration, and checkpoints')
 parser.add_argument('--resume', type=str, default=None, help='Resume training from the latest checkpoint. Argument is the path to the checkpoint directory.')
 args = parser.parse_args()
@@ -19,8 +22,12 @@ args = parser.parse_args()
 print("Welcome to Super GPT Nano Training!")
 print("Training Configuration:", json.dumps(vars(args), indent=4))
 
-# Resuming from checkpoint or starting from scratch?
+
+# /////////////////////////////////////////////////////
+# Verify that checkpoint exists if resuming training
+# /////////////////////////////////////////////////////
 from_scratch = True
+checkpoint_path = None
 if args.resume is not None:
     if os.path.exists(args.resume):
         checkpoint_path = args.resume
@@ -28,7 +35,10 @@ if args.resume is not None:
     else:
         raise ValueError(f"Checkpoint path {args.resume} does not exist.")
 
-# Parameters From Config File
+
+# /////////////////////////////////////////////////////
+# Load parameters from configuration file
+# /////////////////////////////////////////////////////
 with open(args.config, 'r') as configuration:
     config_data = json.load(configuration)
 
@@ -43,25 +53,87 @@ n_embd = config_data['n_embd'] # Number of embedding dimensions to use for embed
 n_layer = config_data['n_layer'] # Number of transformers used in the language model
 n_heads = config_data['n_heads'] # Number of heads in each multi-headed attention block
 dropout = config_data['dropout'] # Dropout percentage to maintain evolution
+use_openwebtext = config_data.get('use_openwebtext', False) # Whether to use OpenWebText dataset
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # Device to run the language model on
 
-print(f'Loading Dataset from {args.dataset}')
-with open(args.dataset, 'r', encoding='utf-8') as f : # Read in the data set
-    text = f.read()
 
-os.makedirs(args.output, exist_ok=True) # Setup output directory
-os.makedirs(f'{args.output}/checkpoints', exist_ok=True) # Setup checkpoints directory
+# /////////////////////////////////////////////////////
+# Load existing tokenizer vocabulary or build a new one
+# /////////////////////////////////////////////////////
+if args.vocab and os.path.exists(args.vocab):
+    print(f'Loading pre-built vocabulary from {args.vocab}')
+    tokenizer = Tokenizer.load_vocab(args.vocab)
+else:
+    if use_openwebtext:
+        print('Building tokenizer vocabulary from OpenWebText sample')
+        ds = load_dataset("Skylion007/openwebtext", split='train')
+        sample_size = min(100000, len(ds))
+        sample_text = ' '.join([ds[i]['text'] for i in range(sample_size)])
+        tokenizer = Tokenizer(sample_text)
+        # Save vocab immediately after building it
+        vocab_cache_path = 'vocab_openwebtext.json'
+        tokenizer.save_vocab(vocab_cache_path)
+        print(f'Vocabulary saved to {vocab_cache_path} for future use (use --vocab {vocab_cache_path} to reuse)')
+    else:
+        dataset_path = f'datasets/{config_data["dataset"]}'
+        print(f'Building tokenizer vocabulary from {dataset_path}')
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+        tokenizer = Tokenizer(text)
 
-# Split the dataset into a training dataset and validation dataset
-print("Tokenizing Dataset")
-tokenizer = Tokenizer(text)
-data = torch.tensor(tokenizer.encode(text), dtype=torch.long)
-n = int(0.8*len(data))
-train_data = data[:n] # 80% to train
-val_data = data[n:] # 20% to test
-print(f'Dataset has {tokenizer.vocab_size()} unique characters, {len(train_data)} training tokens and {len(val_data)} validation tokens.')
+
+# /////////////////////////////////////////////////////
+# Load OpenWebText dataset or custom dataset
+# /////////////////////////////////////////////////////
+if use_openwebtext:
+    print('Loading OpenWebText dataset from Hugging Face')
+    ds = load_dataset("Skylion007/openwebtext", split='train', streaming=True)
+    
+    # Process in chunks to avoid memory issues
+    print('Tokenizing OpenWebText dataset in chunks')
+    chunk_size = 100000  # Process 100k examples at a time
+    max_tokens = 100_000_000  # Limit to 100M tokens (~200MB) to avoid memory issues
+    
+    all_tokens = []
+    for i, example in enumerate(ds):
+        if i % 10000 == 0:
+            print(f'Tokenized {i} examples, {len(all_tokens):,} tokens so far')
+        
+        tokens = tokenizer.encode(example['text'])
+        all_tokens.extend(tokens)
+        
+        # Stop if we've collected enough tokens
+        if len(all_tokens) >= max_tokens:
+            print(f'Reached target of {max_tokens:,} tokens')
+            break
+    
+    data = torch.tensor(all_tokens, dtype=torch.long)
+    del all_tokens
+else:
+    dataset_path = f'datasets/{config_data["dataset"]}'
+    print(f'Loading dataset from {dataset_path}')
+    with open(dataset_path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    data = torch.tensor(tokenizer.encode(text), dtype=torch.long)
+print(f'Dataset loaded: {len(data):,} total tokens')
+
+# Save the tokenizer vocabulary to the output directory
+tokenizer.save_vocab(f'{args.output}/vocab.json')
+print(f'Tokenizer vocabulary saved to {args.output}/vocab.json')
 
 
+# /////////////////////////////////////////////////////
+# Split dataset into training and validation sets
+# /////////////////////////////////////////////////////
+n = int(0.9*len(data))  # 90% train, 10% val for larger datasets
+train_data = data[:n]
+val_data = data[n:]
+print(f'Dataset split: {tokenizer.vocab_size()} unique characters, {len(train_data):,} training tokens, {len(val_data):,} validation tokens.')
+
+
+# /////////////////////////////////////////////////////
+# Helper functions
+# /////////////////////////////////////////////////////
 def get_batch(dataset):
     """
         Randomly samples the training or validation data set
@@ -94,6 +166,10 @@ def estimate_loss():
     model.train()
     return out
 
+
+# //////////////////////////////////////////////////////////////////////
+# Initialize the Bigram Language Model from a checkpoint or from scratch
+# //////////////////////////////////////////////////////////////////////
 if not from_scratch:
     # Load model checkpoint
     print(f"Resuming training from checkpoint at {checkpoint_path}")
@@ -109,7 +185,10 @@ else:
 # Move to GPU if available
 m = model.to(device)
 
-# Learning rate warmup with cosine decay
+
+# /////////////////////////////////////////////////////
+# Initialize the Optimizer and Learning Rate Scheduler
+# /////////////////////////////////////////////////////
 warmup_iters = int(0.1*max_iters)
 cosine_iters = max_iters - warmup_iters
 
@@ -134,23 +213,36 @@ else:
     cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_iters)
     scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_iters])
 
-# Initialize mixed precision training scaler
+
+# ///////////////////////////////////////////////////////
+# Initialize the Grad Scaler for mixed precision training
+# ///////////////////////////////////////////////////////
 scaler = GradScaler(device=device, enabled=(device == 'cuda'))
 
-# Output number of parameters to command line
-print("Number of parameters:", sum(p.numel() for p in m.parameters()), 'Parameters')
-print(f"Mixed precision training: {'Enabled' if device == 'cuda' else 'Disabled (CPU mode)'}")
 
+# ///////////////////////////////////////////////////////
+# Final logging and output before starting training loop
+# ///////////////////////////////////////////////////////
 current_iter = 0
 if not from_scratch:
     current_iter = int(checkpoint_path.split('_')[-1]) # Extract current iteration from checkpoint path
     print(f'Resuming from iteration {current_iter}')
 
-# Training loop
+# Output number of parameters to command line
+print("Number of parameters:", sum(p.numel() for p in m.parameters()), 'Parameters')
+print(f"Mixed precision training: {'Enabled' if device == 'cuda' else 'Disabled (CPU mode)'}")
+os.makedirs(args.output, exist_ok=True) # Setup output directory
+os.makedirs(f'{args.output}/checkpoints', exist_ok=True) # Setup checkpoints directory
+
+
+# ///////////////////////////////////////////////////////
+# Training Loop
+# ///////////////////////////////////////////////////////
 for iter in range(current_iter, max_iters):
     if iter % eval_interval == 0: # Occasionaly output current state of training
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {scheduler.get_last_lr()[0]:.6f}")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, lr {scheduler.get_last_lr()[0]:.6f}")
 
     if iter % checkpoint_interval == 0: # Save model checkpoints
         os.makedirs(f'{args.output}/checkpoints/iteration_{iter}', exist_ok=True)
@@ -174,10 +266,11 @@ for iter in range(current_iter, max_iters):
     scaler.update()
     scheduler.step()
 
-# Save final results
+
+# ///////////////////////////////////////////////////////
+# Save Final Result Model and Configuration
+# ///////////////////////////////////////////////////////
 print("Saving final model")
 torch.save(m.state_dict(), f'{args.output}/result.pt')
-torch.save(optimizer.state_dict(), f'{args.output}/optimizer.pt')
-torch.save(scheduler.state_dict(), f'{args.output}/scheduler.pt')
 with open(f'{args.output}/config.json', 'w') as json_file:
     json.dump(config_data, json_file, indent=4)

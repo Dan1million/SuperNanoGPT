@@ -29,10 +29,10 @@ n_heads = config_data['n_heads'] # Number of heads in each multi-headed attentio
 dropout = config_data['dropout'] # Dropout percentage to maintain evolution
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # Device to run the language model on
 
-with open(f'datasets/{config_data['dataset']}', 'r', encoding='utf-8') as f :
-    text = f.read()
+# Load the tokenizer vocabulary that was saved during training
+vocab_path = f'{args.gpt_path}/vocab.json'
+tokenizer = Tokenizer.load_vocab(vocab_path)
 
-tokenizer = Tokenizer(text)
 model = BigramLanguageModel(block_size, device, dropout, n_embd, n_heads, n_layer, tokenizer.vocab_size())
 model.load_state_dict(torch.load(f'{args.gpt_path}/result.pt', weights_only=True))
 model.eval()

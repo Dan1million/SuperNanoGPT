@@ -11,9 +11,12 @@ The architecture is inspired by:
 This project focuses on understanding GPT internals.
 
 ## Setup
-
-1. Install PyTorch  
-2. Clone this repository
+  
+1. Clone this repository
+2. Setup a .env directory ```python3 -m venv .env```
+3. Activate the .env directory ```.\\.env\\Scripts\\activate```
+2. Install PyTorch ```pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu130```
+3. Install Hugging face datasets library ```pip install datasets```
 
 ### Training
 Run ```py train.py``` which does the following
@@ -38,6 +41,9 @@ From there I have done the following
 * Added checkpointing and resuming from a checkpoint
 * Improved configurability through the use of a configuration file
 * Added ability to generate from saved GPT results
+* Added support for the OpenWebText data set
+* Added saving and loading tokenizer vocabularies
+* Added mixed precision training
 
 From this project, I gained hands-on experience with:
 * The PyTorch SDK
@@ -98,7 +104,7 @@ All advanced parameters are **optional**
 ``` bash
 -h, --help         show the help message and exit
 --config CONFIG    Path to the configuration file (default config/config.json)
---dataset DATASET  Path to the dataset file (default datasets/tinyShakespeare.txt)
+--vocab  VOCAB     Path to a pre-built vocabulary file (default None)
 --output OUTPUT    Directory to save the trained model, cofiguration, and checkpoints (default savedResults/<currentDateTime>)
 --resume RESUME    Resume training from the latest checkpoint. Argument is the path to the checkpoint directory. (default None)
 ```
