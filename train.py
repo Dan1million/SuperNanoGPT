@@ -118,6 +118,7 @@ else:
 print(f'Dataset loaded: {len(data):,} total tokens')
 
 # Save the tokenizer vocabulary to the output directory
+os.makedirs(args.output, exist_ok=True) # Setup output directory
 tokenizer.save_vocab(f'{args.output}/vocab.json')
 print(f'Tokenizer vocabulary saved to {args.output}/vocab.json')
 
@@ -231,7 +232,6 @@ if not from_scratch:
 # Output number of parameters to command line
 print("Number of parameters:", sum(p.numel() for p in m.parameters()), 'Parameters')
 print(f"Mixed precision training: {'Enabled' if device == 'cuda' else 'Disabled (CPU mode)'}")
-os.makedirs(args.output, exist_ok=True) # Setup output directory
 os.makedirs(f'{args.output}/checkpoints', exist_ok=True) # Setup checkpoints directory
 
 
