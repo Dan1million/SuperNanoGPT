@@ -92,7 +92,7 @@ if use_openwebtext:
     # Process in chunks to avoid memory issues
     print('Tokenizing OpenWebText dataset in chunks')
     chunk_size = 100000  # Process 100k examples at a time
-    max_tokens = 100_000_000  # Limit to 100M tokens (~200MB) to avoid memory issues
+    max_tokens = 500_000_000  # Limit to 500M tokens (~1GB) to avoid memory issues
     
     all_tokens = []
     for i, example in enumerate(ds):
@@ -129,6 +129,8 @@ print(f'Tokenizer vocabulary saved to {args.output}/vocab.json')
 n = int(0.9*len(data))  # 90% train, 10% val for larger datasets
 train_data = data[:n]
 val_data = data[n:]
+train_data = train_data.pin_memory()
+val_data = val_data.pin_memory()
 print(f'Dataset split: {tokenizer.vocab_size()} unique characters, {len(train_data):,} training tokens, {len(val_data):,} validation tokens.')
 
 

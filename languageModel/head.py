@@ -74,16 +74,23 @@ class Head(nn.Module):
                 x tensor: the input tensor for the self-attention block
         """
         B,T,C = x.shape # (B,T,C) --> (Batch Size, Sequence Length, Embedding Size)
-        k = self.key(x) # (B, T, C) --> Get the K value
-        q = self.query(x) # (B, T, C) --> Get the Q value
+        k = self.key(x) # (B, T, head_size)
+        q = self.query(x) # (B, T, head_size)
+        v = self.value(x) # (B, T, head_size)
 
-        # Compute attention scores using Attention(Q, K, V) = softmax(QK/sqrt(head_size)) * V
-        wei = q @ k.transpose(-2, -1) * C**-0.5 # Matrix Multiplication Step
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # Masking weights --> set top right triangle to -inf to avoid altering relative weights
-        wei = F.softmax(wei, dim=-1) # Perform the softmax
-        wei = self.dropout(wei) # Perform dropout to avoid overfitting
+        # Add head dimension for scaled_dot_product_attention: (B, 1, T, head_size)
+        q = q.unsqueeze(1)
+        k = k.unsqueeze(1)
+        v = v.unsqueeze(1)
 
-        # Perform weighted aggregation --> the "V" at the end
-        v = self.value(x)
-        out = wei @ v
+        # Compute attention using PyTorch's optimized scaled dot-product attention
+        out = F.scaled_dot_product_attention(
+            q, k, v,
+            attn_mask=None,
+            dropout_p=self.dropout.p if self.training else 0.0,
+            is_causal=True
+        )
+        
+        # Remove head dimension: (B, 1, T, head_size) -> (B, T, head_size)
+        out = out.squeeze(1)
         return out
