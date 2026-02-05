@@ -123,7 +123,7 @@ During training the following is logged:
 ## Hardware Training Requirements
 
 ### Tested Configuration
-- **GPU**: NVIDIA RTX 3080 (16GB VRAM)
+- **GPU**: NVIDIA RTX 5080 (16GB VRAM)
 - **RAM**: 64GB system memory
 - **CPU**: Intel Core Ultra 9
 
