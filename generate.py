@@ -6,11 +6,12 @@ import torch
 from languageModel.bigramLanguageModel import BigramLanguageModel
 from tokenizer.tokenizer import Tokenizer
 
-print("----- Super GPT nano Text Generation -----")
+print("----- CornellNano-172 Text Generation -----")
 # Parse argument for directory holding the GPT model
 parser = argparse.ArgumentParser(description="Generate text using a trained GPT model")
-parser.add_argument("--gpt_path", type=str, default='savedResults\\2026-01-29_17-30-23', help="directory path to the trained GPT model")
+parser.add_argument("--gpt_path", type=str, default='savedResults\\40000_iterations', help="directory path to the trained GPT model")
 parser.add_argument('--tokens', type=int, default=500, help='Number of tokens to generate')
+parser.add_argument('--prompt', type=str, default='', help='Seed text to start generation (optional)')
 args = parser.parse_args()
 
 # Check that the GPT directory exists
@@ -39,7 +40,24 @@ model.eval()
 m = model.to(device)
 
 # Create input vector representing input token index
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
+if args.prompt:
+    # Encode the prompt and use it as seed text
+    prompt_tokens = tokenizer.encode(args.prompt)
+    context = torch.tensor([prompt_tokens], dtype=torch.long, device=device)
+    print(args.prompt, end='', flush=True)
+else:
+    # Start with empty context
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
 
-# Generate new tokens using the GPT model!
-print(tokenizer.decode(m.generate(idx = context, max_new_tokens=args.tokens)[0].tolist()))
+# Generate new tokens in chunks
+tokens_generated = 0
+chunk_size = 20
+
+while tokens_generated < args.tokens:
+    tokens_to_generate = min(chunk_size, args.tokens - tokens_generated)
+    context = m.generate(idx=context, max_new_tokens=tokens_to_generate)
+    new_tokens = context[0, -tokens_to_generate:].tolist()
+    print(tokenizer.decode(new_tokens), end='', flush=True)
+    tokens_generated += tokens_to_generate
+
+print("\n\n----- Generation Complete -----")
